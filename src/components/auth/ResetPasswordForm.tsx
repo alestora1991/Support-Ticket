@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -8,13 +7,14 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { useNavigate, Link } from "react-router-dom";
 import AuthLayout from "./AuthLayout";
-import { KeyRound, ArrowLeft, Check, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { KeyRound, ArrowLeft, Check, X, Lock, Shield } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../../../supabase/supabase";
 import { Progress } from "@/components/ui/progress";
+import { useAuthNotifications } from "./AuthNotifications";
+import { FormInput } from "@/components/ui/form-input";
 
 export default function ResetPasswordForm() {
   const [password, setPassword] = useState("");
@@ -24,6 +24,7 @@ export default function ResetPasswordForm() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const navigate = useNavigate();
+  const { showSuccess, showError } = useAuthNotifications();
 
   // Password strength checker
   useEffect(() => {
@@ -82,8 +83,14 @@ export default function ResetPasswordForm() {
 
       if (error) throw error;
       setIsSuccess(true);
+      showSuccess(
+        "Password Reset Successful",
+        "Your password has been reset successfully. You can now log in with your new password.",
+      );
     } catch (error: any) {
-      setError(error.message || "An error occurred");
+      const errorMessage = error.message || "An error occurred";
+      setError(errorMessage);
+      showError("Password Reset Failed", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -106,112 +113,116 @@ export default function ResetPasswordForm() {
           <CardContent>
             {!isSuccess ? (
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="password">New Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your new password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-                    disabled={isLoading}
-                  />
-                  {password && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span>Password strength:</span>
-                        <span
-                          className={`font-medium ${passwordStrength > 75 ? "text-green-500" : passwordStrength > 50 ? "text-yellow-500" : passwordStrength > 25 ? "text-orange-500" : "text-red-500"}`}
-                        >
-                          {getStrengthText()}
-                        </span>
-                      </div>
-                      <Progress
-                        value={passwordStrength}
-                        className="h-1"
-                        indicatorClassName={getStrengthColor()}
-                      />
-                      <div className="grid grid-cols-2 gap-2 text-xs mt-2">
-                        <div className="flex items-center gap-1">
-                          {password.length >= 8 ? (
-                            <Check className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <X className="h-3 w-3 text-red-500" />
-                          )}
-                          <span>At least 8 characters</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {/\d/.test(password) ? (
-                            <Check className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <X className="h-3 w-3 text-red-500" />
-                          )}
-                          <span>Contains number</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {/[a-z]/.test(password) ? (
-                            <Check className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <X className="h-3 w-3 text-red-500" />
-                          )}
-                          <span>Contains lowercase</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {/[A-Z]/.test(password) ||
-                          /[^A-Za-z0-9]/.test(password) ? (
-                            <Check className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <X className="h-3 w-3 text-red-500" />
-                          )}
-                          <span>Contains uppercase/symbol</span>
-                        </div>
-                      </div>
+                <FormInput
+                  id="password"
+                  label="New Password"
+                  type="password"
+                  placeholder="Enter your new password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  icon={Lock}
+                  error={error && error.includes("stronger") ? error : ""}
+                />
+                {password && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Password strength:</span>
+                      <span
+                        className={`font-medium ${passwordStrength > 75 ? "text-green-500" : passwordStrength > 50 ? "text-yellow-500" : passwordStrength > 25 ? "text-orange-500" : "text-red-500"}`}
+                      >
+                        {getStrengthText()}
+                      </span>
                     </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Confirm your new password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-                    disabled={isLoading}
-                  />
-                  {password && confirmPassword && (
-                    <div className="flex items-center gap-1 text-xs">
-                      {password === confirmPassword ? (
-                        <>
+                    <Progress
+                      value={passwordStrength}
+                      className="h-1"
+                      indicatorClassName={getStrengthColor()}
+                    />
+                    <div className="grid grid-cols-2 gap-2 text-xs mt-2">
+                      <div className="flex items-center gap-1">
+                        {password.length >= 8 ? (
                           <Check className="h-3 w-3 text-green-500" />
-                          <span className="text-green-500">
-                            Passwords match
-                          </span>
-                        </>
-                      ) : (
-                        <>
+                        ) : (
                           <X className="h-3 w-3 text-red-500" />
-                          <span className="text-red-500">
-                            Passwords don't match
-                          </span>
-                        </>
-                      )}
+                        )}
+                        <span>At least 8 characters</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {/\d/.test(password) ? (
+                          <Check className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <X className="h-3 w-3 text-red-500" />
+                        )}
+                        <span>Contains number</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {/[a-z]/.test(password) ? (
+                          <Check className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <X className="h-3 w-3 text-red-500" />
+                        )}
+                        <span>Contains lowercase</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {/[A-Z]/.test(password) ||
+                        /[^A-Za-z0-9]/.test(password) ? (
+                          <Check className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <X className="h-3 w-3 text-red-500" />
+                        )}
+                        <span>Contains uppercase/symbol</span>
+                      </div>
                     </div>
-                  )}
-                </div>
-                {error && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-sm text-red-500"
-                  >
-                    {error}
-                  </motion.p>
+                  </div>
                 )}
+                <FormInput
+                  id="confirmPassword"
+                  label="Confirm Password"
+                  type="password"
+                  placeholder="Confirm your new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  icon={Shield}
+                  error={error && error.includes("match") ? error : ""}
+                  success={confirmPassword && password === confirmPassword}
+                />
+                {password && confirmPassword && (
+                  <div className="flex items-center gap-1 text-xs">
+                    {password === confirmPassword ? (
+                      <>
+                        <Check className="h-3 w-3 text-green-500" />
+                        <span className="text-green-500">Passwords match</span>
+                      </>
+                    ) : (
+                      <>
+                        <X className="h-3 w-3 text-red-500" />
+                        <span className="text-red-500">
+                          Passwords don't match
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+                <AnimatePresence>
+                  {error &&
+                    !error.includes("match") &&
+                    !error.includes("stronger") && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="p-3 bg-red-50 border border-red-200 rounded-lg overflow-hidden mt-2"
+                      >
+                        <p className="text-sm text-red-600 font-medium">
+                          {error}
+                        </p>
+                      </motion.div>
+                    )}
+                </AnimatePresence>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
                     <>

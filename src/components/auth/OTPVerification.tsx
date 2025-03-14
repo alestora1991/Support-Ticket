@@ -10,7 +10,8 @@ import {
 import { useNavigate, Link } from "react-router-dom";
 import AuthLayout from "./AuthLayout";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAuthNotifications } from "./AuthNotifications";
 
 interface OTPVerificationProps {
   email?: string;
@@ -31,8 +32,10 @@ export default function OTPVerification({
   const [isSuccess, setIsSuccess] = useState(false);
   const [resendDisabled, setResendDisabled] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [activeInput, setActiveInput] = useState(-1);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const navigate = useNavigate();
+  const { showSuccess, showError } = useAuthNotifications();
 
   useEffect(() => {
     if (countdown > 0) {
@@ -55,6 +58,7 @@ export default function OTPVerification({
     // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
+      setActiveInput(index + 1);
     }
   };
 
@@ -65,6 +69,7 @@ export default function OTPVerification({
     // Move to previous input on backspace if current input is empty
     if (e.key === "Backspace" && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
+      setActiveInput(index - 1);
     }
   };
 
@@ -78,6 +83,7 @@ export default function OTPVerification({
       setOtp(newOtp);
       // Focus the last input
       inputRefs.current[5]?.focus();
+      setActiveInput(5);
     }
   };
 
@@ -101,8 +107,14 @@ export default function OTPVerification({
       // Call the onVerify callback
       onVerify();
       setIsSuccess(true);
+      showSuccess(
+        "Verification Successful",
+        "Your account has been verified successfully.",
+      );
     } catch (error: any) {
-      setError(error.message || "Invalid verification code");
+      const errorMessage = error.message || "Invalid verification code";
+      setError(errorMessage);
+      showError("Verification Failed", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -114,8 +126,14 @@ export default function OTPVerification({
 
     try {
       await onResend();
+      showSuccess(
+        "Code Resent",
+        "A new verification code has been sent to your email.",
+      );
     } catch (error: any) {
-      setError(error.message || "Failed to resend code");
+      const errorMessage = error.message || "Failed to resend code";
+      setError(errorMessage);
+      showError("Resend Failed", errorMessage);
     }
   };
 
@@ -145,30 +163,51 @@ export default function OTPVerification({
 
                 <div className="flex justify-center gap-2">
                   {otp.map((digit, index) => (
-                    <input
+                    <motion.div
                       key={index}
-                      type="text"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleChange(index, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(index, e)}
-                      onPaste={index === 0 ? handlePaste : undefined}
-                      ref={(el) => (inputRefs.current[index] = el)}
-                      className="w-12 h-12 text-center text-lg font-semibold border rounded-md focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
-                      disabled={isLoading}
-                    />
+                      whileTap={{ scale: 0.95 }}
+                      animate={{
+                        scale: activeInput === index ? 1.05 : 1,
+                        borderColor:
+                          activeInput === index
+                            ? "#6366f1"
+                            : digit
+                              ? "#10b981"
+                              : "#e5e7eb",
+                      }}
+                    >
+                      <input
+                        key={index}
+                        type="text"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleChange(index, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(index, e)}
+                        onPaste={index === 0 ? handlePaste : undefined}
+                        onFocus={() => setActiveInput(index)}
+                        onBlur={() => setActiveInput(-1)}
+                        ref={(el) => (inputRefs.current[index] = el)}
+                        className="w-12 h-12 text-center text-lg font-semibold border rounded-md focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                        disabled={isLoading}
+                      />
+                    </motion.div>
                   ))}
                 </div>
 
-                {error && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-sm text-red-500 text-center"
-                  >
-                    {error}
-                  </motion.p>
-                )}
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="p-3 bg-red-50 border border-red-200 rounded-lg overflow-hidden"
+                    >
+                      <p className="text-sm text-red-600 font-medium">
+                        {error}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
@@ -182,17 +221,26 @@ export default function OTPVerification({
                 </Button>
 
                 <div className="text-center">
-                  <Button
+                  <motion.button
                     type="button"
-                    variant="link"
-                    className="text-sm"
+                    className="text-sm text-indigo-600 hover:text-indigo-800 hover:underline font-medium transition-colors disabled:text-gray-400"
                     onClick={handleResend}
                     disabled={resendDisabled}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    {resendDisabled
-                      ? `Resend code in ${countdown}s`
-                      : "Didn't receive a code? Resend"}
-                  </Button>
+                    {resendDisabled ? (
+                      <motion.span
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        key={countdown}
+                      >
+                        Resend code in {countdown}s
+                      </motion.span>
+                    ) : (
+                      "Didn't receive a code? Resend"
+                    )}
+                  </motion.button>
                 </div>
               </form>
             ) : (

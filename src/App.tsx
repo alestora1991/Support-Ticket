@@ -12,6 +12,8 @@ import AdminLogin from "./components/pages/AdminLogin";
 import TicketDashboard from "./components/tickets/TicketDashboard";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import { AuthProvider, useAuth } from "../supabase/auth";
+import { AuthNotificationsProvider } from "./components/auth/AuthNotifications";
+import AppHeader from "./components/layout/AppHeader";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -56,6 +58,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   return (
     <>
+      <AppHeader />
       <Routes>
         <Route path="/" element={<LoginForm />} />
         <Route path="/signup" element={<SignUpForm />} />
@@ -97,15 +100,17 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
-      <Suspense
-        fallback={
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
-        }
-      >
-        <AppRoutes />
-      </Suspense>
+      <AuthNotificationsProvider>
+        <Suspense
+          fallback={
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+          }
+        >
+          <AppRoutes />
+        </Suspense>
+      </AuthNotificationsProvider>
     </AuthProvider>
   );
 }

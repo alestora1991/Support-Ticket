@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../../supabase/auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useNavigate, Link } from "react-router-dom";
 import AuthLayout from "./AuthLayout";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Mail, Lock, ArrowRight, ShieldCheck } from "lucide-react";
+import { Mail, Lock, ArrowRight, ShieldAlert } from "lucide-react";
+import { useAuthNotifications } from "./AuthNotifications";
+import { FormInput } from "@/components/ui/form-input";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -15,15 +15,21 @@ export default function LoginForm() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [loginAsAdmin, setLoginAsAdmin] = useState(false);
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
+  const { showSuccess, showError } = useAuthNotifications();
 
   // Use useEffect to handle navigation after render
   useEffect(() => {
     if (user) {
-      navigate("/tickets", { replace: true });
+      if (loginAsAdmin && user.email === "it@sos.com.om") {
+        navigate("/admin", { replace: true });
+      } else {
+        navigate("/tickets", { replace: true });
+      }
     }
-  }, [user, navigate]);
+  }, [user, navigate, loginAsAdmin]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,10 +37,12 @@ export default function LoginForm() {
     setIsLoading(true);
 
     try {
-      await signIn(email, password);
+      await signIn(email, password, rememberMe);
       // Navigation will happen in useEffect
+      showSuccess("Login Successful", "You have been successfully logged in.");
     } catch (error) {
       setError("Invalid email or password");
+      showError("Login Failed", "Invalid email or password. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -46,158 +54,168 @@ export default function LoginForm() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="w-full bg-white rounded-xl shadow-lg p-8 max-w-md mx-auto"
+        className="w-full bg-white rounded-xl shadow-xl p-8 max-w-md mx-auto backdrop-blur-sm bg-white/90"
       >
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="h-16 w-16 bg-blue-50 rounded-full flex items-center justify-center">
-              <ShieldCheck className="h-8 w-8 text-blue-600" />
-            </div>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800">
-            Welcome to SOS IT Support
-          </h2>
-          <p className="text-gray-600 mt-2">
-            Sign in to your account to manage your IT support tickets
-          </p>
-        </div>
-
-        <div className="flex justify-center space-x-4 mb-8">
-          <button className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
-            Sign In
-          </button>
-          <Link
-            to="/signup"
-            className="px-6 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-          >
-            Sign Up
-          </Link>
-          <Link
-            to="/forgot-password"
-            className="px-6 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-          >
-            Recovery
-          </Link>
-        </div>
+        <motion.div
+          className="text-center mb-6"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+        >
+          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+            Welcome Back
+          </h1>
+          <p className="text-gray-600 mt-2">Access your support dashboard</p>
+        </motion.div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-2">
-            <Label
-              htmlFor="email"
-              className="text-gray-700 font-medium flex items-center gap-2"
-            >
-              <Mail className="h-4 w-4" /> Email Address
-            </Label>
-            <div className="relative">
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pl-4"
-                disabled={isLoading}
-                autoComplete="email"
-              />
-            </div>
-          </div>
+          <FormInput
+            id="email"
+            label="Email Address"
+            type="email"
+            placeholder="name@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={isLoading}
+            autoComplete="email"
+            icon={Mail}
+            error={error && error.includes("email") ? error : ""}
+          />
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <Label
-                htmlFor="password"
-                className="text-gray-700 font-medium flex items-center gap-2"
-              >
-                <Lock className="h-4 w-4" /> Password
-              </Label>
               <Link
                 to="/forgot-password"
-                className="text-sm text-blue-600 hover:underline font-medium"
+                className="text-sm text-indigo-600 hover:text-indigo-800 hover:underline font-medium transition-colors ml-auto"
               >
                 Forgot password?
               </Link>
             </div>
-            <div className="relative">
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pl-4"
-                disabled={isLoading}
-                autoComplete="current-password"
-              />
-            </div>
+            <FormInput
+              id="password"
+              label="Password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={isLoading}
+              autoComplete="current-password"
+              icon={Lock}
+              error={error && error.includes("password") ? error : ""}
+            />
           </div>
 
-          <div className="flex items-center justify-between">
+          <motion.div
+            className="flex items-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.3 }}
+            whileHover={{ scale: 1.01 }}
+          >
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="remember"
                 checked={rememberMe}
                 onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                className="text-indigo-600 border-indigo-400 focus:ring-indigo-500"
               />
-              <label htmlFor="remember" className="text-sm text-gray-600">
-                Remember me
+              <label
+                htmlFor="remember"
+                className="text-sm text-gray-600 group cursor-pointer"
+                onClick={() => setRememberMe(!rememberMe)}
+              >
+                <span className="group-hover:text-indigo-600 transition-colors">
+                  Remember me
+                </span>
+                <span className="ml-1 text-xs text-gray-400 group-hover:text-indigo-400 transition-colors">
+                  (keeps you logged in)
+                </span>
               </label>
             </div>
-          </div>
+          </motion.div>
 
-          {error && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="p-3 bg-red-50 border border-red-200 rounded-lg"
-            >
-              <p className="text-sm text-red-600 font-medium">{error}</p>
-            </motion.div>
-          )}
-
-          <Button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-base font-medium"
-            disabled={isLoading}
+          <motion.div
+            className="flex items-center space-x-2 p-3 bg-red-50/50 border border-red-200 rounded-lg"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.5, duration: 0.3 }}
+            whileHover={{ backgroundColor: "rgba(254, 226, 226, 0.7)" }}
           >
-            {isLoading ? (
-              <>
-                <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-                <span>Signing in...</span>
-              </>
-            ) : (
-              <>
-                <span>Sign In</span>
-                <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </Button>
+            <Checkbox
+              id="adminLogin"
+              checked={loginAsAdmin}
+              onCheckedChange={(checked) => setLoginAsAdmin(checked as boolean)}
+              className="text-red-600 border-red-400 focus:ring-red-500"
+            />
+            <div className="flex items-center gap-1.5">
+              <ShieldAlert className="h-4 w-4 text-red-600" />
+              <label
+                htmlFor="adminLogin"
+                className="text-sm text-red-700 font-medium"
+              >
+                Login as admin
+              </label>
+            </div>
+          </motion.div>
+
+          <AnimatePresence>
+            {error &&
+              !error.includes("email") &&
+              !error.includes("password") && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="p-3 bg-red-50 border border-red-200 rounded-lg overflow-hidden"
+                >
+                  <p className="text-sm text-red-600 font-medium">{error}</p>
+                </motion.div>
+              )}
+          </AnimatePresence>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.3 }}
+          >
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3 rounded-lg transition-all flex items-center justify-center gap-2 text-base font-medium shadow-md hover:shadow-lg"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                <>
+                  <span>Sign In</span>
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </Button>
+          </motion.div>
         </form>
 
-        <div className="mt-8 text-center">
+        <motion.div
+          className="mt-6 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7, duration: 0.3 }}
+        >
           <p className="text-sm text-gray-600">
-            Don't have an account?{" "}
+            New to our platform?{" "}
             <Link
               to="/signup"
-              className="text-blue-600 hover:underline font-medium"
+              className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium transition-colors"
             >
               Create an account
             </Link>
           </p>
-          <p className="text-sm text-gray-600 mt-2">
-            <Link
-              to="/admin-login"
-              className="text-red-600 hover:underline font-medium"
-            >
-              Admin Login
-            </Link>
-          </p>
-        </div>
-
-        <div className="text-center text-xs text-gray-500 mt-8 pt-4 border-t border-gray-100">
-          © 2023 Hamed Al-Ghaithi. All rights reserved.
-        </div>
+        </motion.div>
       </motion.div>
     </AuthLayout>
   );

@@ -152,47 +152,75 @@ export default function NewTicketDialog({
         }
       }
 
-      // Send notification email to user
-      const { data: userEmailData, error: userEmailError } =
-        await supabase.functions.invoke("send-notification-email", {
-          body: {
-            to: user?.email || "",
-            subject: "Your IT Support Ticket Has Been Received",
-            ticketId: ticketId,
-            ticketTitle: title,
-            userName: userName,
-            type: "user-confirmation",
-          },
+      // Send notification email to user and admin in a single request to reduce potential failures
+      try {
+        // Always send notification to admin regardless of user email status
+        const adminEmail = "it@sos.com.om";
+
+        // Send admin notification
+        const { data: adminEmailData, error: adminEmailError } =
+          await supabase.functions.invoke(
+            "supabase-functions-send-notification-email",
+            {
+              body: {
+                to: adminEmail,
+                subject: "New IT Support Ticket Created",
+                ticketId: ticketId,
+                ticketTitle: title,
+                userName: userName || "User",
+                userEmail: user?.email || "No email provided",
+                type: "admin-notification",
+              },
+            },
+          );
+
+        console.log(
+          "Admin email notification result:",
+          adminEmailData || adminEmailError,
+        );
+
+        if (adminEmailError) {
+          console.error("Error sending admin email:", adminEmailError);
+          throw adminEmailError;
+        }
+
+        // If user has email, also send them a confirmation
+        if (user?.email) {
+          const { data: userEmailData, error: userEmailError } =
+            await supabase.functions.invoke(
+              "supabase-functions-send-notification-email",
+              {
+                body: {
+                  to: user.email,
+                  subject: "Your IT Support Ticket Has Been Received",
+                  ticketId: ticketId,
+                  ticketTitle: title,
+                  userName: userName || "User",
+                  type: "user-confirmation",
+                },
+              },
+            );
+
+          console.log(
+            "User email notification result:",
+            userEmailData || userEmailError,
+          );
+
+          if (userEmailError) {
+            console.error("Error sending user email:", userEmailError);
+            // Don't throw here, we already sent admin notification
+          }
+        }
+      } catch (emailError) {
+        console.error("Failed to send notification emails:", emailError);
+        // Continue with ticket creation even if emails fail
+        toast({
+          variant: "warning",
+          title: "Email Notification Issue",
+          description:
+            "Your ticket was created but we couldn't send confirmation emails. Our team has been notified and will address this issue.",
         });
-
-      console.log(
-        "User email notification result:",
-        userEmailData || userEmailError,
-      );
-      if (userEmailError)
-        console.error("Error sending user email:", userEmailError);
-
-      // Send notification to admin
-      const { data: adminEmailData, error: adminEmailError } =
-        await supabase.functions.invoke("send-notification-email", {
-          body: {
-            to: "it@sos.com.om", // Admin email
-            subject: "New IT Support Ticket Created",
-            ticketId: ticketId,
-            ticketTitle: title,
-            userName: userName,
-            userEmail: user?.email,
-            type: "admin-notification",
-          },
-        });
-
-      console.log(
-        "Admin email notification result:",
-        adminEmailData || adminEmailError,
-      );
-
-      if (adminEmailError)
-        console.error("Error sending admin email:", adminEmailError);
+      }
 
       // Show success message and close dialog
       toast({

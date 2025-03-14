@@ -4,8 +4,12 @@ import App from "./App.tsx";
 import "./index.css";
 import { BrowserRouter } from "react-router-dom";
 
-import { TempoDevtools } from "tempo-devtools";
-TempoDevtools.init();
+// Only initialize Tempo in development mode
+if (import.meta.env.DEV) {
+  import("tempo-devtools").then(({ TempoDevtools }) => {
+    TempoDevtools.init();
+  });
+}
 
 const basename = import.meta.env.BASE_URL;
 

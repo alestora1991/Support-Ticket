@@ -115,6 +115,22 @@ export default function AdminDashboard() {
           () => {
             console.log("New ticket received!");
             fetchTickets();
+            // Show notification toast for new ticket
+            toast({
+              variant: "default",
+              title: "New Ticket Received",
+              description: "A new support ticket has been submitted.",
+              duration: 10000, // 10 seconds
+            });
+            // Play notification sound
+            const audio = new Audio(
+              "https://assets.mixkit.co/active_storage/sfx/922/922-preview.mp3",
+            );
+            audio
+              .play()
+              .catch((e) =>
+                console.error("Could not play notification sound:", e),
+              );
           },
         )
         .on(
@@ -141,7 +157,7 @@ export default function AdminDashboard() {
         supabase.removeChannel(channel);
       };
     }
-  }, [user]);
+  }, [user, toast]);
 
   const fetchTickets = async () => {
     setIsLoading(true);
@@ -259,17 +275,25 @@ export default function AdminDashboard() {
       // Notify user about status change
       const ticket = tickets.find((t) => t.id === ticketId);
       if (ticket && ticket.user?.email) {
-        await supabase.functions.invoke("send-notification-email", {
-          body: {
-            to: ticket.user.email,
-            subject: `Your IT Support Ticket Status Updated: ${ticket.title}`,
-            ticketId: ticketId,
-            ticketTitle: ticket.title,
-            userName: ticket.user.full_name,
-            status: newStatus,
-            type: "status-update",
-          },
-        });
+        try {
+          await supabase.functions.invoke(
+            "supabase-functions-send-notification-email",
+            {
+              body: {
+                to: ticket.user.email,
+                subject: `Your IT Support Ticket Status Updated: ${ticket.title}`,
+                ticketId: ticketId,
+                ticketTitle: ticket.title,
+                userName: ticket.user.full_name,
+                status: newStatus,
+                type: "status-update",
+              },
+            },
+          );
+        } catch (emailError) {
+          console.error("Failed to send status update email:", emailError);
+          // Continue with ticket update even if email fails
+        }
       }
     } catch (error) {
       console.error("Error updating ticket:", error);
