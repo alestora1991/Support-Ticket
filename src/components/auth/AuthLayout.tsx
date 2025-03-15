@@ -1,20 +1,14 @@
 import { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { TicketCheck, Clock, HeadphonesIcon } from "lucide-react";
-import AppHeader from "../layout/AppHeader";
 
 interface AuthLayoutProps {
   children: ReactNode;
-  showHeader?: boolean;
 }
 
-export default function AuthLayout({
-  children,
-  showHeader = false,
-}: AuthLayoutProps) {
+export default function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-br from-indigo-900 via-purple-800 to-indigo-700">
-      {showHeader && <AppHeader transparent={true} />}
       <div className="w-full md:w-1/2 flex flex-col justify-center px-6 md:px-16 py-10 md:py-0 text-white order-2 md:order-1">
         <div className="mb-8 self-start">
           <motion.img

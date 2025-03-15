@@ -16,14 +16,81 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+// Define all functions outside the component
+function checkSession() {
+  return supabase.auth.getSession().then(({ data: { session } }) => {
+    return session?.user ?? null;
+  });
+}
+
+async function signInUser(email: string, password: string, rememberMe = false) {
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+    options: {
+      // Always persist the session, we'll handle the remember me logic ourselves
+      persistSession: true,
+    },
+  });
+
+  if (error) throw error;
+
+  // Store the user's preference for session persistence
+  if (rememberMe) {
+    localStorage.setItem("auth_persistence", "persistent");
+  } else {
+    localStorage.setItem("auth_persistence", "session");
+    // Set a flag in sessionStorage to detect browser restarts
+    sessionStorage.setItem("session_active", "true");
+  }
+}
+
+async function signUpUser(email: string, password: string, fullName: string) {
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: fullName,
+      },
+    },
+  });
+  if (error) throw error;
+}
+
+async function signOutUser() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+
+  // Clear persistence settings
+  localStorage.removeItem("auth_persistence");
+  sessionStorage.removeItem("session_active");
+}
+
+function checkSessionPersistence(
+  user: User | null,
+  signOut: () => Promise<void>,
+) {
+  const persistenceType = localStorage.getItem("auth_persistence");
+  const sessionActive = sessionStorage.getItem("session_active");
+
+  // If user chose not to be remembered and this is a new browser session
+  if (persistenceType === "session" && !sessionActive && user) {
+    // This is a new browser session, sign the user out
+    signOut();
+  }
+}
+
+// Export the provider component as a named function
+function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Auth state change listener
   useEffect(() => {
     // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    checkSession().then((user) => {
+      setUser(user);
       setLoading(false);
     });
 
@@ -38,71 +105,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (
-    email: string,
-    password: string,
-    rememberMe = false,
-  ) => {
-    // Set the session persistence based on the rememberMe flag
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-      options: {
-        // When rememberMe is true, session persists after browser close
-        // When false, session is cleared when browser is closed
-        persistSession: rememberMe,
-      },
-    });
+  // Sign in function wrapper
+  async function signIn(email: string, password: string, rememberMe = false) {
+    await signInUser(email, password, rememberMe);
+  }
 
-    if (error) throw error;
+  // Sign up function wrapper
+  async function signUp(email: string, password: string, fullName: string) {
+    await signUpUser(email, password, fullName);
+  }
 
-    // Store the user's preference for session persistence
-    if (rememberMe) {
-      localStorage.setItem("auth_persistence", "persistent");
-    } else {
-      localStorage.setItem("auth_persistence", "session");
-      // Set a flag in sessionStorage to detect browser restarts
-      sessionStorage.setItem("session_active", "true");
-    }
-  };
+  // Sign out function wrapper
+  async function signOut() {
+    await signOutUser();
+  }
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
-    if (error) throw error;
-  };
-
-  const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-
-    // Clear persistence settings
-    localStorage.removeItem("auth_persistence");
-    sessionStorage.removeItem("session_active");
-  };
-
-  // Check on initial load if we should clear the session
+  // Session persistence check function
   useEffect(() => {
-    const checkSessionPersistence = () => {
-      const persistenceType = localStorage.getItem("auth_persistence");
-      const sessionActive = sessionStorage.getItem("session_active");
-
-      // If user chose not to be remembered and this is a new browser session
-      if (persistenceType === "session" && !sessionActive && user) {
-        // This is a new browser session, sign the user out
-        signOut();
-      }
-    };
-
     if (!loading) {
-      checkSessionPersistence();
+      checkSessionPersistence(user, signOut);
     }
 
     // Mark this browser session
@@ -111,8 +132,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Also check when the window gains focus (in case of browser restart)
-    window.addEventListener("focus", checkSessionPersistence);
-    return () => window.removeEventListener("focus", checkSessionPersistence);
+    const handleFocus = () => checkSessionPersistence(user, signOut);
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, [user, loading]);
 
   return (
@@ -122,10 +144,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useAuth() {
+// Export the hook as a named function
+function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }
+
+export { AuthProvider, useAuth };
